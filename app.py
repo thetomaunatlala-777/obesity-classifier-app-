@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
+
 
 st.write(""" # Obesity Classifier App
          """)
@@ -100,9 +103,76 @@ st.markdown("""
 st.dataframe(df.dtypes)
 
 
+st.write(""" ### 3. Visualisations
+         """)
+
+
 num_cols = ['Age', 'Height', 'Weight', 'BMI']
 
-df[num_cols].hist(bins=20, figsize=(12, 8), color='lightblue', edgecolor='black')
-plt.suptitle("Histograms of Numeric Features", fontsize=16)
+fig, axes = plt.subplots(len(num_cols) // 2, 2, figsize=(12, 8))  
+axes = axes.flatten()
+
+
+for i in range(0, len(num_cols), 2):
+    col1, col2 = st.columns(2)  
+    
+   
+    with col1:
+        fig, ax = plt.subplots(figsize=(5, 4))
+        ax.hist(df[num_cols[i]], bins=20, color='lightblue', edgecolor='black')
+        ax.set_title(f"{num_cols[i]} Distribution")
+        ax.set_xlabel(num_cols[i])
+        ax.set_ylabel("Frequency")
+        st.pyplot(fig)
+
+    if i + 1 < len(num_cols):
+        with col2:
+            fig, ax = plt.subplots(figsize=(5, 4))
+            ax.hist(df[num_cols[i + 1]], bins=20, color='lightblue', edgecolor='black')
+            ax.set_title(f"{num_cols[i + 1]} Distribution")
+            ax.set_xlabel(num_cols[i + 1])
+            ax.set_ylabel("Frequency")
+            st.pyplot(fig)
+
+st.markdown(""" 
+- The histograms of Age, Height, Weight, and BMI help identify skewed data, outliers, and imbalanced distributions in the dataset.  
+- The graphs provide an immediate visual comparison, showing which bars are close or far apart in height. This observable pattern can be useful for identifying similarities between features.  
+""")
+
+
+fig, ax = plt.subplots(figsize=(8,5))
+
+sns.boxplot(data=df, x="Label", y="Age", palette="crest")
+
+ax.set_title("Age Distribution Across Obesity Categories")
+ax.set_xlabel("Obesity Category (Label)")
+ax.set_ylabel("Age")
+ax.tick_params(axis='x', rotation=45)
+
 plt.tight_layout()
-st.pyplot(plt.show())
+st.pyplot(fig)
+
+st.markdown("""
+- This boxplot compares the ages within each obesity category, showing differences in median age and age range.
+- We can see that the median age for obese individuals is between 50-60 years of age, whilst underweight individuals is between 25-35 years of age
+""")
+
+
+
+num_cols = ['Weight', 'BMI'] 
+
+
+selected_col = st.selectbox("Select attribute to compare against Obesity Category (Label)", num_cols)
+
+
+agg_df = df.groupby("Label")[selected_col].mean().reset_index()
+
+fig = px.bar(
+    agg_df, 
+    x="Label", 
+    color_discrete_sequence=['lightblue'],
+    y=selected_col, 
+    title=f"{selected_col} by Obesity Levels"
+)
+
+st.plotly_chart(fig, use_container_width=True)
