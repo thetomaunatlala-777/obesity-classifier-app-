@@ -1,9 +1,37 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 import plotly.express as px
+from numpy.random import default_rng as rng
 
+import base64
+
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+def set_png_as_page_bg(png_file, blur_intensity=5):
+    bin_str = get_base64_of_bin_file(png_file)
+    page_bg_img = f'''
+    <style>
+    .stApp {{
+        background-image: url("data:image/png;base64,{bin_str}");
+        background-size: cover;
+        background-position: center;
+    
+        
+        z-index: -1;
+    }}
+    </style>
+    '''
+    st.markdown(page_bg_img, unsafe_allow_html=True)
+
+set_png_as_page_bg('logo.jpg')
+
+#######
 
 st.write(""" # Obesity Classifier App
          """)
@@ -24,14 +52,17 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 
-st.write(""" ### 1. Loading the data
-         """)
-
 st.markdown("""
             <p>
             The goal is to use health metrics such as Age, Body Mass Index (BMI), Gender, Weight and Height to classify an individual's weight status (into categories namely: obese, overweight, underweight or normalweight.
             </p>
             """, unsafe_allow_html=True)
+
+
+st.write(""" ### 1. Loading the data
+         """)
+
+
 
 
 
@@ -176,3 +207,125 @@ fig = px.bar(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
+#########
+count_df = df.groupby(['Label', 'Gender']).size().reset_index(name='count')
+blue_colors = ['#aec6cf', '#1f4e79']
+
+fig = px.bar(
+    count_df,
+    x='Label',
+    y='count',
+    color='Gender',
+    barmode='group',
+    title='Gender Count by Obesity Category',
+    color_discrete_sequence=blue_colors
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+st.write("""
+From the above information:
+
+- 68.1% of Underweight individuals are Females
+- Males are the only individuals who are Obese.
+""")
+
+########
+
+# Check age groups of Male and Female individuals to oversee patterns for BMI, Weight and Height
+# Create age bins from 10 to 119 (inclusive)
+bins = list(range(10, 121, 10))
+labels = [f"{i}-{i+9}" for i in bins[:-1]]
+
+# Create a new column in your dataframe for age groups
+df['Age_Group'] = pd.cut(df['Age'], bins=bins, labels=labels, right=False)
+
+# Filter data for Male and Female separately
+male_data = df[df['Gender'].str.lower() == 'male']
+female_data = df[df['Gender'].str.lower() == 'female']
+
+# Group by Age_Group and compute mean + count
+male_summary = male_data.groupby('Age_Group').agg(
+    Count=('Gender', 'count'),
+    Mean_BMI=('BMI', 'mean'),
+    Mean_Height=('Height', 'mean'),
+    Mean_Weight=('Weight', 'mean')
+).round(1).reset_index()
+
+female_summary = female_data.groupby('Age_Group').agg(
+    Count=('Gender', 'count'),
+    Mean_BMI=('BMI', 'mean'),
+    Mean_Height=('Height', 'mean'),
+    Mean_Weight=('Weight', 'mean')
+).round(1).reset_index()
+
+x = male_summary['Age_Group']
+
+# Create two columns for first row
+col1, col2 = st.columns(2)
+
+with col1:
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(x, male_summary['Mean_BMI'], marker='o', label='Male', linewidth=2)
+    ax.plot(x, female_summary['Mean_BMI'], marker='o', label='Female', linewidth=2)
+    ax.set_title('Mean BMI by Age Group')
+    ax.set_xlabel('Age Group')
+    ax.set_ylabel('Mean BMI')
+    ax.legend()
+    plt.xticks(rotation=45)
+    ax.grid(True)
+    st.pyplot(fig)
+
+with col2:
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(x, male_summary['Mean_Height'], marker='o', label='Male', linewidth=2)
+    ax.plot(x, female_summary['Mean_Height'], marker='o', label='Female', linewidth=2)
+    ax.set_title('Mean Height by Age Group')
+    ax.set_xlabel('Age Group')
+    ax.set_ylabel('Mean Height (cm)')
+    ax.legend()
+    plt.xticks(rotation=45)
+    ax.grid(True)
+    st.pyplot(fig)
+
+# Create two columns for second row
+col3, col4 = st.columns(2)
+
+with col3:
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(x, male_summary['Mean_Weight'], marker='o', label='Male', linewidth=2)
+    ax.plot(x, female_summary['Mean_Weight'], marker='o', label='Female', linewidth=2)
+    ax.set_title('Mean Weight by Age Group')
+    ax.set_xlabel('Age Group')
+    ax.set_ylabel('Mean Weight (kg)')
+    ax.legend()
+    plt.xticks(rotation=45)
+    ax.grid(True)
+    st.pyplot(fig)
+
+with col4:
+    fig, ax = plt.subplots(figsize=(6, 4))
+    bar_width = 0.4
+    r1 = np.arange(len(x))
+    r2 = [i + bar_width for i in r1]
+    ax.bar(r1, male_summary['Count'], width=bar_width, label='Male')
+    ax.bar(r2, female_summary['Count'], width=bar_width, label='Female')
+    ax.set_title('Participant Count by Age Group')
+    ax.set_xlabel('Age Group')
+    ax.set_ylabel('Count')
+    ax.set_xticks([r + bar_width / 2 for r in range(len(x))])
+    ax.set_xticklabels(x, rotation=45)
+    ax.legend()
+    st.pyplot(fig)
+
+
+
+######
+
+# Check for correlations
+fig, ax = plt.subplots(figsize=(10, 8))
+numeric_data = df.select_dtypes(include='number')
+sns.heatmap(numeric_data.corr(), annot=True, cmap='coolwarm')
+plt.title('Correlation Matrix')
+st.pyplot(fig)
